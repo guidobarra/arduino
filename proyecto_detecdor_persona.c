@@ -5,7 +5,7 @@
 #define BAUDIOS_9600 9600
 
 //CANTIDAD DE SENSORES
-#define MAX_CANT_SENSORES                           2
+#define MAX_CANT_SENSORES                           3
 
 //UMBRALES DE DISTANCIAS
 #define UMBRAL_DISTANCIA_MAXIMA                    366
@@ -26,7 +26,8 @@
 #define PIN_LED_RGB_AZUL     3
 
 //OTROS PINES
-#define PIN_ULTRASONIDO 7
+#define PIN_ULTRASONIDO_UNO 7
+#define PIN_ULTRASONIDO_DOS 6
 #define PIN_POTENCIOMETRO A3
 #define PIN_ALARMA 8
 #define PIN_PWM_BRILLO_LED 9
@@ -35,8 +36,10 @@
 #define PIN_BOTHOM_DESACTIVAR_ALARMA A0
 
 //NUMEROS DEL SENSOR DE ULTRASONIDO 
-#define SENSOR_ULTRASONIDO_UNO   0
-#define SENSOR_ULTRASONIDO_DOS   1
+#define NRO_UNO_ULTRASONIDO   0
+#define NRO_DOS_ULTRASONIDO   1
+#define NRO_UNO_POTE          2
+#define CANT_SENSOR_ULTRASONIDO          2
 
 //TIEMPOS
 #define DOS_MICROSEGUNDOS                      2
@@ -47,11 +50,17 @@
 // CICLO DE TRABAJO
 #define DUTY_CYCLE_BRILLO_MAX                     255
 #define DUTY_CYCLE_BRILLO_MEDIO                   170
-#define DUTY_CYCLE_BRILLO_MIN                     85
+#define DUTY_CYCLE_BRILLO_MIN                     20
 
 // CANTIDAD DE EVENTOS Y ESTADOS
 #define MAX_STATES 4
 #define MAX_EVENTS 8
+
+// ESTADOS DEL SENSOR ULTRASONIDO
+#define ESTADO_DIST_CERCA 1
+#define ESTADO_DIST_MEDIO 2
+#define ESTADO_DIST_LEJOS 3
+#define ESTADO_DIST_MAXIMO 100
 
 //VALORES CONSTANTES
 #define CERO 0
@@ -86,7 +95,9 @@ stSensor sensores[MAX_CANT_SENSORES];
 
 int pin_alarma = PIN_ALARMA;
 
-int pin_ultrasonido = PIN_ULTRASONIDO;
+int g_pin_ultrasonido_uno = PIN_ULTRASONIDO_UNO;
+
+int g_pin_ultrasonido_dos = PIN_ULTRASONIDO_DOS;
 
 bool timeout;
 
@@ -140,47 +151,88 @@ bool verificar_umbral_pote_brillo_min(int valor_pote) {
 }
 // ---------------------------------------------
 
+
+//ORDEN DE PRIORIDAD
+// ESTADO_DIST_CERCA, ESTADO_DIST_MEDIO, ESTADO_DIST_LEJOS, ESTADO_DIST_MAXIMO
+// ---------------------------------------------
+bool verificar_prioridad_sensores_ultrasonido(int estado_actual)
+{
+
+	int mayor_prioridad_estado = ESTADO_DIST_MAXIMO; // tiene la menor prioridad
+	//recorro los sensores de ultrasonido y me quedo con el que tiene la mayor prioridad
+	for(int i=CERO; i < CANT_SENSOR_ULTRASONIDO; i++)
+	{
+		if( sensores[i].estado < mayor_prioridad_estado )
+		{
+			mayor_prioridad_estado = sensores[i].estado;
+		}
+	}	
+	// comparo el estado del sensor y con el estado del sensor que tiene mayor prioridad
+	return estado_actual <= mayor_prioridad_estado;
+}
+
 //VERIFICAR UMBRALES
+
 // ---------------------------------------------
 bool verificar_umbrales_distancia(int valor_actual, int num_sensor_ultrasonido)
 {
-  if( verificar_umbral_distancia_cerca(valor_actual) )
+	if( verificar_umbral_distancia_cerca(valor_actual) )
     {
-      sensores[num_sensor_ultrasonido].estado = EV_DIST_CERCA;
+	  sensores[num_sensor_ultrasonido].estado = ESTADO_DIST_CERCA;
       new_event = EV_DIST_CERCA;
     }
     else if( verificar_umbral_distancia_media(valor_actual) )
     {
-      sensores[num_sensor_ultrasonido].estado = EV_DIST_MEDIO;
+	  sensores[num_sensor_ultrasonido].estado = ESTADO_DIST_MEDIO;
       new_event = EV_DIST_MEDIO;
     }
     else if( verificar_umbral_distancia_lejos(valor_actual) )
     {
-      sensores[num_sensor_ultrasonido].estado = EV_DIST_LEJOS;
+	  sensores[num_sensor_ultrasonido].estado = ESTADO_DIST_LEJOS;
       new_event = EV_DIST_LEJOS;
     } else 
     {
       return false;
     }
-    
+
     return true;	
+}
+// --------------------------------------------
+
+// ---------------------------------------------
+bool verificar_umbrales_prioridad(int valor_actual, int num_sensor_ultrasonido)
+{
+	if( verificar_umbrales_distancia(valor_actual, num_sensor_ultrasonido) )
+    {
+	  if (verificar_prioridad_sensores_ultrasonido(sensores[num_sensor_ultrasonido].estado) == true)
+	  {
+	    return true;
+	  }
+    }
+
+	new_event = EV_CONT;
+    return false;	
 }
 // ---------------------------------------------
 
 // ---------------------------------------------
 bool verificar_umbrales_potenciometro(int valor_pote, int num_potenciometro)
 {		
-  if( alarma_activa == true && verificar_umbral_pote_brillo_min(valor_pote) )
+    if(alarma_activa == false)
+	{
+		return false;
+	}
+	else if( verificar_umbral_pote_brillo_min(valor_pote) )
     {
       sensores[num_potenciometro].estado = EV_POTE_BRILLO_MIN;
       new_event = EV_POTE_BRILLO_MIN;
     }
-    else if( alarma_activa == true && verificar_umbral_pote_brillo_medio(valor_pote) )
+    else if( verificar_umbral_pote_brillo_medio(valor_pote) )
     {
       sensores[num_potenciometro].estado = EV_POTE_BRILLO_MEDIO;
       new_event = EV_POTE_BRILLO_MEDIO;
     }
-    else if( alarma_activa == true && verificar_umbral_pote_brillo_max(valor_pote) )
+    else if( verificar_umbral_pote_brillo_max(valor_pote) )
     {
       sensores[num_potenciometro].estado = EV_POTE_BRILLO_MAX;
       new_event = EV_POTE_BRILLO_MAX;
@@ -300,6 +352,37 @@ void none()
 }
 //----------------------------------------------
 
+//ACCIONES DE BRILLO
+//----------------------------------------------
+void brillo_min()
+{
+  actualizar_led_brillo_min( );
+  current_state = ST_IDLE;
+  Serial.print(sensores[2].estado);
+  Serial.print("\n");
+}
+//----------------------------------------------
+
+//----------------------------------------------
+void brillo_media()
+{
+  actualizar_led_brillo_medio( );
+  current_state = ST_IDLE;
+  Serial.print(sensores[2].estado);
+  Serial.print("\n");
+}
+//----------------------------------------------
+
+//----------------------------------------------
+void brillo_max()
+{
+  actualizar_led_brillo_max( );
+  current_state = ST_IDLE;
+  Serial.print(sensores[2].estado);
+  Serial.print("\n");
+}
+//----------------------------------------------
+
 //ACCIONES DE DESTANCIA
 //----------------------------------------------
 void dist_media()
@@ -321,40 +404,10 @@ void dist_lejos()
 void dist_cerca()
 {
   actualizar_indicador_led_rojo( );
+  actualizar_led_brillo_medio( );
   tone(pin_alarma, FRECUENCIA_TONO);
   current_state = ST_WAITING_RESPONSE;
   alarma_activa = true;
-}
-//----------------------------------------------
-
-//ACCIONES DE BRILLO
-//----------------------------------------------
-void brillo_min()
-{
-  actualizar_led_brillo_min( );
-  current_state = ST_IDLE;
-  Serial.print(sensores[1].estado);
-  Serial.print("\n");
-}
-//----------------------------------------------
-
-//----------------------------------------------
-void brillo_media()
-{
-  actualizar_led_brillo_medio( );
-  current_state = ST_IDLE;
-  Serial.print(sensores[1].estado);
-  Serial.print("\n");
-}
-//----------------------------------------------
-
-//----------------------------------------------
-void brillo_max()
-{
-  actualizar_led_brillo_max( );
-  current_state = ST_IDLE;
-  Serial.print(sensores[1].estado);
-  Serial.print("\n");
 }
 //----------------------------------------------
 
@@ -385,7 +438,8 @@ bool verificar_estado_sensor_button_desactivar()
 // ---------------------------------------------
 bool verificar_estado_sensor_ultrasonido(int num_sensor_ultrasonido)
 {
-  sensores[num_sensor_ultrasonido].valor_actual = FACTOR_DE_ESCALA_CM * leer_distancia_ultrasonido(pin_ultrasonido, pin_ultrasonido);
+  int nro_pin = sensores[num_sensor_ultrasonido].pin;
+  sensores[num_sensor_ultrasonido].valor_actual = FACTOR_DE_ESCALA_CM * leer_distancia_ultrasonido(nro_pin, nro_pin);
   
   int valor_actual = sensores[num_sensor_ultrasonido].valor_actual;
   int valor_previo = sensores[num_sensor_ultrasonido].valor_previo;
@@ -394,7 +448,7 @@ bool verificar_estado_sensor_ultrasonido(int num_sensor_ultrasonido)
   {
     sensores[num_sensor_ultrasonido].valor_previo = valor_actual;
     
-    return verificar_umbrales_distancia(valor_actual, num_sensor_ultrasonido);
+    return verificar_umbrales_prioridad(valor_actual, num_sensor_ultrasonido);
   }
   
   return false;
@@ -435,10 +489,11 @@ void get_new_event( )
     timeout = false;
     lct     = ct;
     
-    if( (verificar_estado_sensor_ultrasonido(SENSOR_ULTRASONIDO_UNO) == true) || 
+    if( (verificar_estado_sensor_ultrasonido(NRO_UNO_ULTRASONIDO) == true) ||
+	    (verificar_estado_sensor_ultrasonido(NRO_DOS_ULTRASONIDO) == true) ||
       	(verificar_estado_sensor_button_activar() == true) ||
        	(verificar_estado_sensor_button_desactivar() == true) ||
-		(verificar_estado_sensor_potenciometro(1) == true)	
+		(verificar_estado_sensor_potenciometro(NRO_UNO_POTE) == true)	
       )
     {
       return;
@@ -493,7 +548,8 @@ void do_init()
   
   current_state = ST_INIT;// Inicializo el evento inicial
   
-  init_sensor_ultrasonido(SENSOR_ULTRASONIDO_UNO, pin_ultrasonido);
+  init_sensor_ultrasonido(NRO_UNO_ULTRASONIDO, g_pin_ultrasonido_uno);
+  init_sensor_ultrasonido(NRO_DOS_ULTRASONIDO, g_pin_ultrasonido_dos);
   
   //manejo de timeout
   timeout = false;
