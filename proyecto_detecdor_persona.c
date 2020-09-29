@@ -25,13 +25,20 @@
 #define PIN_LED_RGB_VERDE    4
 #define PIN_LED_RGB_AZUL     3
 
-//OTROS PINES
+//PINES ULTRASONIDO
 #define PIN_ULTRASONIDO_UNO 7
 #define PIN_ULTRASONIDO_DOS 6
+
+//PIN POTENCIOMETRO
 #define PIN_POTENCIOMETRO A3
+
+//PIN ALARMA
 #define PIN_ALARMA 8
+
+//PIN PWM
 #define PIN_PWM_BRILLO_LED 9
 
+//PINES BOTHOM
 #define PIN_BOTHOM_ACTIVAR_ALARMA    A1
 #define PIN_BOTHOM_DESACTIVAR_ALARMA A0
 
@@ -82,7 +89,6 @@ transition state_table[MAX_STATES][MAX_EVENTS] =
       
      //EV_CONT  , EV_DIST_LEJOS  , EV_DIST_MEDIO , EV_DIST_CERCA , EV_ACK_BOTHOM, EV_POTE_BRILLO_MAX  , EV_POTE_BRILLO_MEDIO  , EV_POTE_BRILLO_MIN  
 };
-//----------------------------------------------
 
 struct stSensor
 {
@@ -167,12 +173,11 @@ bool verificar_prioridad_sensores_ultrasonido(int estado_actual)
 			mayor_prioridad_estado = sensores[i].estado;
 		}
 	}	
-	// comparo el estado del sensor y con el estado del sensor que tiene mayor prioridad
+	// comparo el estado del sensor, con el estado del sensor que tiene mayor prioridad
 	return estado_actual <= mayor_prioridad_estado;
 }
 
 //VERIFICAR UMBRALES
-
 // ---------------------------------------------
 bool verificar_umbrales_distancia(int valor_actual, int num_sensor_ultrasonido)
 {
@@ -358,8 +363,8 @@ void brillo_min()
 {
   actualizar_led_brillo_min( );
   current_state = ST_IDLE;
-  Serial.print(sensores[2].estado);
-  Serial.print("\n");
+  //Serial.print(sensores[2].estado);
+  //Serial.print("\n");
 }
 //----------------------------------------------
 
@@ -368,8 +373,8 @@ void brillo_media()
 {
   actualizar_led_brillo_medio( );
   current_state = ST_IDLE;
-  Serial.print(sensores[2].estado);
-  Serial.print("\n");
+  //Serial.print(sensores[2].estado);
+  //Serial.print("\n");
 }
 //----------------------------------------------
 
@@ -378,8 +383,8 @@ void brillo_max()
 {
   actualizar_led_brillo_max( );
   current_state = ST_IDLE;
-  Serial.print(sensores[2].estado);
-  Serial.print("\n");
+  //Serial.print(sensores[2].estado);
+  //Serial.print("\n");
 }
 //----------------------------------------------
 
@@ -413,25 +418,27 @@ void dist_cerca()
 
 //VERIFICAR SENSORES
 // ---------------------------------------------
-bool verificar_estado_sensor_button_activar()
+bool verificar_estado_sensor_button_desactivar()
 {
-  bool edle_bothom = digitalRead(A0) == HIGH;
-  if (edle_bothom) {
+  bool resp = (digitalRead(PIN_BOTHOM_DESACTIVAR_ALARMA) == HIGH);
+  if (resp) 
+  {
     new_event = EV_CONT;
     current_state = ST_INIT;
   }
-  return edle_bothom;
+  return resp;
 }
 // ---------------------------------------------
 
 // ---------------------------------------------
-bool verificar_estado_sensor_button_desactivar()
+bool verificar_estado_sensor_button_activar()
 {
-  bool edle_bothom = digitalRead(A1) == HIGH;
-  if (edle_bothom) {
+  bool resp = (digitalRead(PIN_BOTHOM_ACTIVAR_ALARMA) == HIGH);
+  if (resp) 
+  {
     new_event = EV_ACK_BOTHOM;
   }
-  return edle_bothom;
+  return resp;
 }
 // ---------------------------------------------
 
@@ -476,6 +483,15 @@ bool verificar_estado_sensor_potenciometro(int num_potenciometro)
 }
 // ---------------------------------------------
 
+bool verificar_sensores()
+{
+  return ((verificar_estado_sensor_ultrasonido(NRO_UNO_ULTRASONIDO) == true) ||
+	     (verificar_estado_sensor_ultrasonido(NRO_DOS_ULTRASONIDO) == true) ||
+      	 (verificar_estado_sensor_button_activar() == true) ||
+       	 (verificar_estado_sensor_button_desactivar() == true) ||
+		 (verificar_estado_sensor_potenciometro(NRO_UNO_POTE) == true) );
+}
+
 //----------------------------------------------
 void get_new_event( )
 {
@@ -485,23 +501,17 @@ void get_new_event( )
 
   if( timeout )
   {
-    // Doy acuse de la recepcion del timeout
+    // recepcion del timeout consumida
     timeout = false;
     lct     = ct;
     
-    if( (verificar_estado_sensor_ultrasonido(NRO_UNO_ULTRASONIDO) == true) ||
-	    (verificar_estado_sensor_ultrasonido(NRO_DOS_ULTRASONIDO) == true) ||
-      	(verificar_estado_sensor_button_activar() == true) ||
-       	(verificar_estado_sensor_button_desactivar() == true) ||
-		(verificar_estado_sensor_potenciometro(NRO_UNO_POTE) == true)	
-      )
+    if( verificar_sensores())
     {
       return;
     }
   }
   
-  // Genero evento dummy ....
-  new_event = EV_CONT;
+  new_event = EV_CONT;// Genero evento dummy ....
 }
 // ---------------------------------------------
 
@@ -511,7 +521,7 @@ void maquina_estados_detector_presencia()
 {
   get_new_event();
   
-  if( (new_event >= 0) && (new_event < MAX_EVENTS) && (current_state >= 0) && (current_state < MAX_STATES) )
+  if( (new_event >= CERO) && (new_event < MAX_EVENTS) && (current_state >= CERO) && (current_state < MAX_STATES) )
   {
     if( new_event != EV_CONT )
     {
@@ -519,10 +529,6 @@ void maquina_estados_detector_presencia()
    
     state_table[current_state][new_event]();
   }
-  else
-  {
-  }
-  
   
   new_event   = EV_CONT;// Consumo el evento...
   
@@ -540,16 +546,27 @@ void init_sensor_ultrasonido(int nro_sensor_ultra, int pin_sensor_ultra)
 //----------------------------------------------
 
 //----------------------------------------------
+void init_sensor_potenciometro(int nro_sensor_pote, int pin_sensor_pote)
+{
+  sensores[nro_sensor_pote].valor_actual = CERO;
+  sensores[nro_sensor_pote].valor_previo = CERO;
+  sensores[nro_sensor_pote].estado = CERO;
+  sensores[nro_sensor_pote].pin = pin_sensor_pote;	
+} 
+//----------------------------------------------
+
+//----------------------------------------------
 void do_init() 
 {
-  pinMode(A0, INPUT);
+  pinMode(PIN_BOTHOM_DESACTIVAR_ALARMA, INPUT);
   pinMode(pin_alarma, OUTPUT);
-  pinMode(A1, INPUT);
+  pinMode(PIN_BOTHOM_ACTIVAR_ALARMA, INPUT);
   
   current_state = ST_INIT;// Inicializo el evento inicial
   
   init_sensor_ultrasonido(NRO_UNO_ULTRASONIDO, g_pin_ultrasonido_uno);
   init_sensor_ultrasonido(NRO_DOS_ULTRASONIDO, g_pin_ultrasonido_dos);
+  init_sensor_potenciometro(NRO_UNO_POTE, PIN_POTENCIOMETRO);
   
   //manejo de timeout
   timeout = false;
