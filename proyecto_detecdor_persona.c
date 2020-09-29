@@ -540,7 +540,7 @@ void init_sensor_ultrasonido(int nro_sensor_ultra, int pin_sensor_ultra)
 {
   sensores[nro_sensor_ultra].valor_actual = CERO;
   sensores[nro_sensor_ultra].valor_previo = CERO;
-  sensores[nro_sensor_ultra].estado = CERO;
+  sensores[nro_sensor_ultra].estado = ESTADO_DIST_MAXIMO;
   sensores[nro_sensor_ultra].pin = pin_sensor_ultra;	
 } 
 //----------------------------------------------
