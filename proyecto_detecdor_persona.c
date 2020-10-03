@@ -329,7 +329,7 @@ void apagar_leds( )
 //----------------------------------------------
 
 //----------------------------------------------
-void actualizar_indicador_led_azul( )
+void actualizar_indicador_led_amarrillo( )
 {
   digitalWrite(PIN_LED_RGB_VERDE, true);
   digitalWrite(PIN_LED_RGB_AZUL , false);
@@ -446,7 +446,7 @@ void dist_lejos()
 //----------------------------------------------
 void dist_media()
 {
-  actualizar_indicador_led_azul( );
+  actualizar_indicador_led_amarrillo( );
   current_state = ST_ALARMA_DESACTIVADA;
 }
 //----------------------------------------------
