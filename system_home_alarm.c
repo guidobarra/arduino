@@ -102,7 +102,7 @@ struct stSensor
 };
 stSensor sensores[MAX_CANT_SENSORES];
 
-int pin_alarma = PIN_ALARMA;
+int g_pin_alarma = PIN_ALARMA;
 
 int g_pin_ultrasonido_uno = PIN_ULTRASONIDO_UNO;
 
@@ -140,7 +140,7 @@ void init_sensor_potenciometro(int nro_sensor_pote, int pin_sensor_pote)
 void init_pines()
 {
   pinMode(PIN_BOTHOM_DESACTIVAR_ALARMA, INPUT);
-  pinMode(pin_alarma, OUTPUT);
+  pinMode(g_pin_alarma, OUTPUT);
   pinMode(PIN_BOTHOM_ACTIVAR_ALARMA, INPUT);
 }
 //----------------------------------------------
@@ -390,7 +390,7 @@ void init_()
 {
   apagar_leds();
   actualizar_led_brillo_apagar();
-  noTone(pin_alarma);
+  noTone(g_pin_alarma);
   init_pines();
   init_sensores();
   current_state = ST_ALARMA_DESACTIVADA;
@@ -456,7 +456,7 @@ void dist_cerca()
 {
   actualizar_indicador_led_rojo( );
   actualizar_led_brillo_min( );
-  tone(pin_alarma, FRECUENCIA_TONO);
+  tone(g_pin_alarma, FRECUENCIA_TONO);
   current_state = ST_ALARMA_ACTIVADA;
 }
 //----------------------------------------------
@@ -597,7 +597,7 @@ void do_init()
 
   current_state = ST_INIT;// Inicializo el evento inicial
 
-  noTone(pin_alarma);
+  noTone(g_pin_alarma);
   Serial.begin(BAUDIOS_9600);
 }
 //----------------------------------------------
