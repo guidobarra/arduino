@@ -589,9 +589,6 @@ void init_sensores()
 void do_init()
 {
 
-  init_pines();
-  init_sensores();
-
   //manejo de timeout
   timeout = false;
   lct     = millis();
@@ -599,7 +596,10 @@ void do_init()
   current_state = ST_INIT;// Inicializo el evento inicial
 
   noTone(pin_alarma);
+  Serial.begin(BAUDIOS_9600);
   init_();
+  init_pines();
+  init_sensores();
 }
 //----------------------------------------------
 
