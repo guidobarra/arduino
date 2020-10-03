@@ -1,5 +1,35 @@
+// Habilitacion de debug para la impresion por el puerto serial ...
+//----------------------------------------------
+#define SERIAL_DEBUG_ENABLED 1
+
+#if SERIAL_DEBUG_ENABLED
+  #define DebugPrint(str)\
+      {\
+        Serial.println(str);\
+      }
+#else
+  #define DebugPrint(str)
+#endif
+
+#define DebugPrintEstado(estado,evento)\
+      {\
+        String est = estado;\
+        String evt = evento;\
+        String str;\
+        str = "-----------------------------------------------------";\
+        DebugPrint(str);\
+        str = "EST-> [" + est + "]: " + "EVT-> [" + evt + "].";\
+        DebugPrint(str);\
+        str = "-----------------------------------------------------";\
+        DebugPrint(str);\
+      }
+//----------------------------------------------
+
 //FACTOR DE ESCALA
 #define FACTOR_DE_ESCALA_CM                    0.01723
+
+//ERROR
+#define ERROR_STRING "-------------ERROR--------------"
 
 //BAUDIOS
 #define BAUDIOS_9600                              9600
@@ -78,8 +108,8 @@
 enum states          { ST_INIT,  ST_ALARMA_DESACTIVADA        , ST_ALARMA_ACTIVADA   , ST_ERROR                                                  } current_state;
 String states_s [] = {"ST_INIT", "ST_ALARMA_DESACTIVADA"      , "ST_ALARMA_ACTIVADA" , "ST_ERROR"                                                };
 
-enum events          { EV_CONT ,   EV_DIST_LEJOS , EV_DIST_MEDIO   , EV_DIST_CERCA  , EV_POTE_BRILLO_MAX  , EV_POTE_BRILLO_MEDIO  , EV_POTE_BRILLO_MIN  , EV_PUL_ACTIVAR  , EV_PUL_DESACTIVAR   } new_event;
-String events_s [] = {"EV_CONT",  "EV_DIST_LEJOS", "EV_DIST_MEDIO" , "EV_DIST_CERCA", "EV_POTE_BRILLO_MAX", "EV_POTE_BRILLO_MEDIO", "EV_POTE_BRILLO_MIN", "EV_PUL_ACTIVAR", "EV_PUL_DESACTIVAR" };
+enum events          { EV_CONT ,   EV_DIST_LEJOS , EV_DIST_MEDIO   , EV_DIST_CERCA  , EV_POTE_BRILLO_MAX  , EV_POTE_BRILLO_MEDIO  , EV_POTE_BRILLO_MIN  , EV_PUL_ACTIVAR  , EV_PUL_DESACTIVAR  , EV_UNKNOW  } new_event;
+String events_s [] = {"EV_CONT",  "EV_DIST_LEJOS", "EV_DIST_MEDIO" , "EV_DIST_CERCA", "EV_POTE_BRILLO_MAX", "EV_POTE_BRILLO_MEDIO", "EV_POTE_BRILLO_MIN", "EV_PUL_ACTIVAR", "EV_PUL_DESACTIVAR", "EV_UNKNOW"};
 
 typedef void (*transition)();
 
@@ -388,6 +418,7 @@ void actualizar_led_brillo_apagar( )
 //----------------------------------------------
 void init_()
 {
+  DebugPrintEstado(states_s[current_state], events_s[new_event]);
   apagar_leds();
   actualizar_led_brillo_apagar();
   noTone(g_pin_alarma);
@@ -580,9 +611,18 @@ void maquina_estados_detector_presencia()
 
   if( (new_event >= CERO) && (new_event < MAX_EVENTS) && (current_state >= CERO) && (current_state < MAX_STATES) )
   {
+	if( new_event != EV_CONT )
+    {
+      DebugPrintEstado(states_s[current_state], events_s[new_event]);
+    }
     state_table[current_state][new_event]();
   }
-
+  else
+  {
+    Serial.print(ERROR_STRING);
+    DebugPrintEstado(states_s[ST_ERROR], events_s[EV_UNKNOW]);
+  }
+  
   new_event   = EV_CONT;// Consumo el evento...
 
 }
